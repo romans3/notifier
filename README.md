@@ -2,8 +2,9 @@
 
 # Appdaemon Notifier for Home Assistant
 [![Buy me a coffee](https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg)](https://www.buymeacoffee.com/jumping)<span style="margin-left:15px;font-size:28px !important;">Buy me a coffee</span></a>
-
+[![Buy me a coffee](https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg)](https://paypal.me/giusepperomano1972)<span style="margin-left:15px;font-size:28px !important;">Buy me a coffee</span></a>
 ### [Support our work with a donation](https://paypal.me/hassiohelp)
+[Support my work with a donation](https://paypal.me/giusepperomano1972)
 
 Notifier Centre for Home Assistant [jumping2000](https://github.com/jumping2000/appdaemon/commits?author=jumping2000)<br>
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/jumping2000/notifier)](https://github.com/jumping2000/notifier/releases)
