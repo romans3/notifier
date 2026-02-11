@@ -1,5 +1,7 @@
 import hassapi as hass
 import helpermodule as h
+import datetime
+import re
 
 """
 Class Phone_Manager handles sending call to voice notfyng service
@@ -11,7 +13,6 @@ SUB_TTS = [(r"[\*\-\[\]_\(\)\{\~\|\}\s]+", r" ")]
 
 class Phone_Manager(hass.Hass):
     def initialize(self):
-        self.tts_language = self.args.get("tts_language")
         self.dict_lingua = {
             "it-IT": "it-IT-Standard-A",
             "en-GB": "en-GB-Standard-A",
@@ -21,11 +22,17 @@ class Phone_Manager(hass.Hass):
             "es-ES": "es-ES-Standard-A",
         }
 
-    def send_voice_call(self, data, phone_name: str, sip_server_name: str):
-        message = h.replace_regular(data["message"], SUB_TTS)
+    def replace_regular(self, text: str, substitutions: list):
+        for old, new in substitutions:
+            text = re.sub(old, new, text.strip())
+        return text
+
+    def send_voice_call(self, data, phone_name: str, sip_server_name: str, language: str):
+        message = self.replace_regular(data["message"], SUB_TTS)
         message_tts = message.replace(" ", "%20")
         called_number = data["called_number"]
-        lang = self.dict_lingua.get(self.get_state(self.tts_language))
+
+        lang = self.dict_lingua.get(language)
         phone_name = phone_name.lower().replace(" ", "_")
         if phone_name.find("voip_call") != -1:
             if called_number != "":

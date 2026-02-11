@@ -1,84 +1,138 @@
-'''Miscellaneous support functions for notifier'''
+"""
+helpermodule.py
+Modulo di utilità centralizzato per tutto il sistema di notifiche.
+"""
+
 import re
 
-
-def check_location(data, location)->bool:
-    return (str(data).lower() =="" or str(data).lower()==location)
-
-def check_notify(data)->bool:
-    return False if (str(data).lower() in ["false","off","no"] or data == "0" or data == 0) else True
-
-def convert(lst):  
-    return {lst[1]: lst[3]}
-
-# check if is true
-def check_boolean(value)->bool:
-    return str(value).lower() in ["true", "on", "yes", "1"]
-
-def get_arg(args, key):
-    key = args[key]
-    if type(key) is str and key.startswith("secret_"):
-        if key in secret_dict:
-            return secret_dict[key]
-        else:
-            raise KeyError("Could not find {} in secret_dict".format(key))
-    else:
-        return key
-
-def get_arg_list(args, key):
-    arg_list = []
-    if isinstance(args[key], list):
-        arg = args[key]
-    else:
-        arg = (args[key]).split(",")
-    for key in arg:
-        if type(key) is str and key.startswith("secret_"):
-            if key in secrets.secret_dict:
-                arg_list.append(secrets.secret_dict[key])
-            else:
-                raise KeyError("Could not find {} in secret_dict".format(key))
-        else:
-            arg_list.append(key)
-    return arg_list
-
-def lg(message):
-    log(message, level="DEBUG", ascii_encode=False)
-
-# """Remove a key from a dict."""
-def remove_key(d, key)->dict:
-    r = dict(d)
-    del r[key]
-    return r
-
-# """check if is an array and returns a list is input is a text"""
-def return_array(target)->list:
-    if isinstance(target, list):
-        return target
-    else:
-        return list(target.split(","))
-        
-# def replace_regular(text, substitutions: list)->str:
-#     if isinstance(text, str):
-#         for old,new in substitutions:
-#             text = re.sub(old, new, text.strip())
-#         return text
-#     else:
-#          return text
+# ---------------------------------------------------------
+# STRING CLEANING
+# ---------------------------------------------------------
 
 def replace_regular(text: str, substitutions: list) -> str:
-        for old, new in substitutions:
-            regex = re.compile(old)
-            text = re.sub(regex, new, str(text).strip())
-        return text
+    """Applica sostituzioni regex in modo sicuro."""
+    text = "" if text is None else str(text)
+    for old, new in substitutions:
+        regex = re.compile(old)
+        text = re.sub(regex, new, text.strip())
+    return text
 
-def replace_language(s: str)->str:
-    return (s[:2])
 
-# """Remove all tags from a string."""
-def remove_tags(text: str)->str:
+def replace_language(lang: str) -> str:
+    """Ritorna solo le prime due lettere della lingua."""
+    if not lang:
+        return "it"
+    return str(lang)[:2]
+
+
+def remove_tags(text: str) -> str:
+    """Rimuove tag HTML."""
+    text = "" if text is None else str(text)
     regex = re.compile(r"<.*?>")
-    return re.sub(regex, "", str(text).strip())
+    return re.sub(regex, "", text.strip())
 
-def has_numbers(string):
+
+def has_numbers(string: str):
+    """Rileva numeri lunghi (anni, codici, ecc.)."""
+    if not string:
+        return False
     numbers = re.compile(r"\d{4,}|\d{3,}\.\d")
     return numbers.search(string)
+
+
+# ---------------------------------------------------------
+# SAFE ACCESSORS
+# ---------------------------------------------------------
+
+def safe_get(data: dict, key: str, default=None):
+    """Accesso sicuro a un dict."""
+    if isinstance(data, dict) and key in data:
+        return data[key]
+    return default
+
+
+def safe_bool(value) -> bool:
+    """Interpreta un valore come booleano."""
+    if value is None:
+        return False
+    return str(value).lower() in ["true", "on", "yes", "1"]
+
+
+def safe_list(value):
+    """Ritorna sempre una lista."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return str(value).split(",")
+
+
+# ---------------------------------------------------------
+# DEVICE LIST NORMALIZATION
+# ---------------------------------------------------------
+
+def split_device_list(value):
+    """Normalizza media_player in lista."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [v.strip() for v in str(value).split(",") if v.strip()]
+
+
+# ---------------------------------------------------------
+# GOOGLE PAYLOAD NORMALIZATION (ESTESA)
+# ---------------------------------------------------------
+
+def normalize_google_payload(google: dict, default_player: str, default_volume: float, tts_period_volume: float = None) -> dict:
+    """
+    Normalizza il payload Google per GH_Manager.
+    Garantisce che tutti i campi siano presenti e validi.
+    """
+
+    if not isinstance(google, dict):
+        google = {}
+
+    # message
+    message = safe_get(google, "message_tts") or safe_get(google, "message") or " "
+    message = str(message).strip() or " "
+
+    # language
+    language = replace_language(safe_get(google, "language", "it"))
+
+    # volume base
+    if tts_period_volume is not None:
+        volume = float(tts_period_volume)
+    else:
+        volume = float(safe_get(google, "volume", default_volume))
+
+    # media player
+    media_player = split_device_list(safe_get(google, "media_player", default_player))
+
+    # audio / media_content_id
+    media_id = safe_get(google, "media_content_id") or safe_get(google, "audio") or ""
+    media_type = safe_get(google, "media_content_type", "music")
+
+    # ---------------------------------------------------------
+    # NUOVE OPZIONI AVANZATE (SOFT MODE)
+    # ---------------------------------------------------------
+    options = {
+        "only_audio": safe_bool(google.get("only_audio")),
+        "only_tts": safe_bool(google.get("only_tts")),
+        "audio_first": safe_bool(google.get("audio_first", True)),
+        "audio_volume": google.get("audio_volume"),
+        "tts_volume": google.get("tts_volume"),
+        "delay_after_audio": google.get("delay_after_audio", 0),
+        "interrupt": safe_bool(google.get("interrupt", True)),
+        "resume": safe_bool(google.get("resume", True)),
+    }
+
+    return {
+        "message": message,
+        "language": language,
+        "volume": volume,
+        "media_player": media_player,
+        "media_content_id": media_id,
+        "media_content_type": media_type,
+        "options": options
+    }
